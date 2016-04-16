@@ -17,9 +17,15 @@ package cmd
 
 import (
 	"fmt"
+	"log"
+	"sync"
 
 	"github.com/spf13/cobra"
+	G "gopkg.in/gilmour-libs/gilmour-e-go.v4"
 )
+
+var isSlot bool
+var isRequest bool
 
 // tailCmd respresents the tail command
 var tailCmd = &cobra.Command{
@@ -27,24 +33,61 @@ var tailCmd = &cobra.Command{
 	Short: "Listen to messages that arrive on a Gilmour Topic",
 	Long: `Keep listening to messages that arrive on a topic.
 
+	All gilmour slots and Requests emit Signals on:
+	gilmour.slot.log.gilmour.<slot|request>.<topic>
+
+	A signal is sent as early as a message is received for that topic, and in case
+	of request the response will also be emitted.
+
+	You must specify the --slot or --request switch as well to define wether goli
+	should sniff a slot or a request.
+
 	Usage:
-	goli tail topic`,
+	goli tail <topic>`,
 
 	Run: func(cmd *cobra.Command, args []string) {
-		// TODO: Work your own magic here
-		fmt.Println("tail called")
+		if len(args) < 1 {
+			cmd.Help()
+			return
+		}
+
+		engine := getEngine()
+
+		topic := args[0]
+		switch {
+		case isSlot:
+			topic = fmt.Sprintf("gilmour.slot.%v", topic)
+		case isRequest:
+			topic = fmt.Sprintf("gilmour.request.%v", topic)
+		default:
+			cmd.Help()
+			return
+		}
+
+		topic = fmt.Sprintf("gilmour.log.%v", topic)
+		fmt.Println("Starting tail on", topic)
+
+		engine.Slot(topic, func(req *G.Request) {
+			var msg interface{}
+			if err := req.Data(&msg); err != nil {
+				log.Println("Cannot parse log %v", err.Error())
+				return
+			}
+
+			log.Println(req.Sender(), "->", msg)
+		}, nil)
+
+		engine.Start()
+
+		var wg sync.WaitGroup
+		wg.Add(1)
+		wg.Wait()
 	},
 }
 
 func init() {
+	tailCmd.Flags().BoolVarP(&isSlot, "slot", "", false, "Is this topic a slot?")
+	tailCmd.Flags().BoolVarP(&isRequest, "request", "", false, "Is this topic a Request?")
+
 	RootCmd.AddCommand(tailCmd)
-
-	// Here you will define your flags and configuration settings
-
-	// Cobra supports Persistent Flags which will work for this command and all subcommands
-	// tailCmd.PersistentFlags().String("foo", "", "A help for foo")
-
-	// Cobra supports local flags which will only run when this command is called directly
-	// tailCmd.Flags().BoolP("toggle", "t", false, "Help message for toggle" )
-
 }

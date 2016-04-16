@@ -21,27 +21,27 @@ import (
 	"github.com/spf13/cobra"
 )
 
-// ruokCmd respresents the ruok command
-var ruokCmd = &cobra.Command{
-	Use:   "ruok",
+// pingCmd respresents the ping command
+var pingCmd = &cobra.Command{
+	Use:   "ping",
 	Short: "Is the gilmour subscriber still active?",
 	Long: `Is the gilmour server stil alive for the given health-ident?
 	Heartbeat is subject to a timeout. Read documentation for details.`,
 	Run: func(cmd *cobra.Command, args []string) {
 		// TODO: Work your own magic here
-		fmt.Println("ruok called")
+		fmt.Println("ping called")
 	},
 }
 
 func init() {
-	RootCmd.AddCommand(ruokCmd)
+	RootCmd.AddCommand(pingCmd)
 
 	// Here you will define your flags and configuration settings
 
 	// Cobra supports Persistent Flags which will work for this command and all subcommands
-	// ruokCmd.PersistentFlags().String("foo", "", "A help for foo")
+	// pingCmd.PersistentFlags().String("foo", "", "A help for foo")
 
 	// Cobra supports local flags which will only run when this command is called directly
-	// ruokCmd.Flags().BoolP("toggle", "t", false, "Help message for toggle" )
+	// pingCmd.Flags().BoolP("toggle", "t", false, "Help message for toggle" )
 
 }

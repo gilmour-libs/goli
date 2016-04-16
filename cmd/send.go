@@ -21,28 +21,28 @@ import (
 	"github.com/spf13/cobra"
 )
 
-// sendCmd respresents the send command
-var sendCmd = &cobra.Command{
-	Use:   "send",
-	Short: "Send JSON data to a slot",
-	Long: `Send a json data to a gilmour slot.
+// sgnlCmd respresents the sgnl command
+var sgnlCmd = &cobra.Command{
+	Use:   "sgnl",
+	Short: "sgnl JSON data to a slot",
+	Long: `sgnl a json data to a gilmour slot.
 	Do note that this does not acknowledge delivery or failure, evern there is no
 	active slot on the other side.`,
 	Run: func(cmd *cobra.Command, args []string) {
 		// TODO: Work your own magic here
-		fmt.Println("send called")
+		fmt.Println("sgnl called")
 	},
 }
 
 func init() {
-	RootCmd.AddCommand(sendCmd)
+	RootCmd.AddCommand(sgnlCmd)
 
 	// Here you will define your flags and configuration settings
 
 	// Cobra supports Persistent Flags which will work for this command and all subcommands
-	// sendCmd.PersistentFlags().String("foo", "", "A help for foo")
+	// sgnlCmd.PersistentFlags().String("foo", "", "A help for foo")
 
 	// Cobra supports local flags which will only run when this command is called directly
-	// sendCmd.Flags().BoolP("toggle", "t", false, "Help message for toggle" )
+	// sgnlCmd.Flags().BoolP("toggle", "t", false, "Help message for toggle" )
 
 }
