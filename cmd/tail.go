@@ -18,14 +18,27 @@ package cmd
 import (
 	"fmt"
 	"log"
+	"strings"
 	"sync"
 
 	"github.com/spf13/cobra"
 	G "gopkg.in/gilmour-libs/gilmour-e-go.v4"
 )
 
-var isSlot bool
-var isRequest bool
+var isSlot, isRequest bool
+
+func originalTopic(t string, isSlot bool) string {
+	topicType := "request"
+	if isSlot {
+		topicType = "slot"
+	}
+
+	arr := strings.Split(t, fmt.Sprintf("gilmour.log.gilmour.%v.", topicType))
+	if len(arr) > 1 {
+		return arr[1]
+	}
+	return t
+}
 
 // tailCmd respresents the tail command
 var tailCmd = &cobra.Command{
@@ -34,7 +47,7 @@ var tailCmd = &cobra.Command{
 	Long: `Keep listening to messages that arrive on a topic.
 
 	All gilmour slots and Requests emit Signals on:
-	gilmour.slot.log.gilmour.<slot|request>.<topic>
+	gilmour.log.gilmour.<slot|request>.<topic>
 
 	A signal is sent as early as a message is received for that topic, and in case
 	of request the response will also be emitted.
@@ -43,17 +56,24 @@ var tailCmd = &cobra.Command{
 	should sniff a slot or a request.
 
 	Usage:
-	goli tail <topic>`,
+	goli tail --slot # Listen to all Slots
+	goli tail --request # Listen to all Requests
+	goli tail <topic> --slot #Listen to a particular slot
+	`,
 
 	Run: func(cmd *cobra.Command, args []string) {
+		var topic string
+
 		if len(args) < 1 {
-			cmd.Help()
-			return
+			topic = "*"
+		} else {
+			topic = args[0]
 		}
 
 		engine := getEngine()
+		trapInterrupt(engine)
+		defer engine.Stop()
 
-		topic := args[0]
 		switch {
 		case isSlot:
 			topic = fmt.Sprintf("gilmour.slot.%v", topic)
@@ -65,7 +85,7 @@ var tailCmd = &cobra.Command{
 		}
 
 		topic = fmt.Sprintf("gilmour.log.%v", topic)
-		fmt.Println("Starting tail on", topic)
+		log.Println("Starting tail on", topic)
 
 		engine.Slot(topic, func(req *G.Request) {
 			var msg interface{}
@@ -74,7 +94,7 @@ var tailCmd = &cobra.Command{
 				return
 			}
 
-			log.Println(req.Sender(), "->", msg)
+			log.Println(req.Sender(), "@", originalTopic(req.Topic(), isSlot), "->", msg)
 		}, nil)
 
 		engine.Start()

@@ -3,6 +3,8 @@ package cmd
 import (
 	"fmt"
 	"log"
+	"os"
+	"os/signal"
 	"sync"
 
 	"github.com/spf13/cobra"
@@ -22,6 +24,19 @@ var RootCmd = &cobra.Command{
 	Run: func(cmd *cobra.Command, args []string) {
 		// Do Stuff Here
 	},
+}
+
+func trapInterrupt(engine *G.Gilmour) {
+	c := make(chan os.Signal, 1)
+	signal.Notify(c, os.Interrupt)
+	go func(e *G.Gilmour) {
+		for sig := range c {
+			// sig is a ^C, handle it
+			log.Println("Caught interrupt", sig)
+			e.Stop()
+			os.Exit(0)
+		}
+	}(engine)
 }
 
 func init() {
