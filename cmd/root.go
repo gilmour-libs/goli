@@ -7,13 +7,15 @@ import (
 	"os/signal"
 	"sync"
 
+	"github.com/meson10/goraph"
 	"github.com/spf13/cobra"
 	G "gopkg.in/gilmour-libs/gilmour-e-go.v4"
 	"gopkg.in/gilmour-libs/gilmour-e-go.v4/backends"
 )
 
 var redisPort int
-var once sync.Once
+var engineOnce, backendOnce sync.Once
+var backend *backends.Redis
 var engine *G.Gilmour
 var redisHost, redisPass string
 
@@ -23,6 +25,7 @@ var RootCmd = &cobra.Command{
 	Long:  `A Fast and Powerful debugger & monitor for your Gilmour architecture.`,
 	Run: func(cmd *cobra.Command, args []string) {
 		// Do Stuff Here
+		cmd.Help()
 	},
 }
 
@@ -53,15 +56,25 @@ func init() {
 	RootCmd.PersistentFlags().StringVarP(
 		&redisPass, "password", "", "", "Password to connect to Redis",
 	)
+
+	RootCmd.PersistentFlags().BoolVarP(
+		&goraph.MachineReadable, "machine-readable", "", false, "Use comma separated graph output to be used for Command line tools",
+	)
 }
 
-func getEngine() *G.Gilmour {
-	once.Do(func() {
-		redis := backends.MakeRedis(
+func getBackend() *backends.Redis {
+	backendOnce.Do(func() {
+		backend = backends.MakeRedis(
 			fmt.Sprintf("%v:%v", redisHost, redisPort),
 			redisPass,
 		)
+	})
+	return backend
+}
 
+func getEngine() *G.Gilmour {
+	engineOnce.Do(func() {
+		redis := getBackend()
 		engine = G.Get(redis)
 	})
 

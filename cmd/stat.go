@@ -17,19 +17,71 @@ package cmd
 
 import (
 	"fmt"
+	"log"
 
+	"github.com/meson10/goraph"
 	"github.com/spf13/cobra"
+	G "gopkg.in/gilmour-libs/gilmour-e-go.v4"
 )
+
+func testHost(engine *G.Gilmour, host string) ([]string, error) {
+	data := G.NewMessage().SetData("ping?")
+	req := engine.NewRequest(fmt.Sprintf("gilmour.health.%v", host))
+
+	var topics []string
+	resp, err := req.Execute(data)
+	if err != nil {
+		return topics, err
+	}
+
+	msg := resp.Next()
+	msg.GetData(&topics)
+	return topics, nil
+}
+
+func makeGraph(engine *G.Gilmour, idents map[string]string) goraph.Graph {
+	root := goraph.MakeGraph()
+
+	for host, _ := range idents {
+		node := goraph.NewNode(host)
+		node.SetType("host")
+
+		topics, err := testHost(engine, host)
+		if err != nil {
+			log.Println("Error communicating with", host, err.Error())
+			continue
+		}
+
+		for _, t := range topics {
+			tnode := goraph.NewNode(t)
+			tnode.SetType("topic")
+			node.AddChild(tnode)
+		}
+
+		root.AddChild(node)
+	}
+	return root
+}
 
 // statCmd respresents the stat command
 var statCmd = &cobra.Command{
 	Use:   "stat",
 	Short: "Get all registered health-idents",
-	Long: `This is a powerful utility to later be combined with goli ruok to
-	checkk for heartbeat on each health-topic`,
 	Run: func(cmd *cobra.Command, args []string) {
 		// TODO: Work your own magic here
-		fmt.Println("stat called")
+		redis := getBackend()
+		engine := getEngine()
+		defer engine.Stop()
+
+		idents, err := redis.ActiveIdents()
+		if err != nil {
+			log.Println("Cannot fetch Idents:", err.Error())
+			return
+		}
+
+		engine.Start()
+		graph := makeGraph(engine, idents)
+		graph.Walk()
 	},
 }
 
