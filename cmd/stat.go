@@ -48,7 +48,9 @@ func makeGraph(engine *G.Gilmour, idents map[string]string) goraph.Graph {
 
 		topics, err := testHost(engine, host)
 		if err != nil {
-			log.Println("Error communicating with", host, err.Error())
+			msg := fmt.Sprintf("Error %v communicating with %v", host, err.Error())
+			node.SetDirty()
+			node.AddNote(msg)
 			continue
 		}
 
@@ -87,13 +89,4 @@ var statCmd = &cobra.Command{
 
 func init() {
 	RootCmd.AddCommand(statCmd)
-
-	// Here you will define your flags and configuration settings
-
-	// Cobra supports Persistent Flags which will work for this command and all subcommands
-	// statCmd.PersistentFlags().String("foo", "", "A help for foo")
-
-	// Cobra supports local flags which will only run when this command is called directly
-	// statCmd.Flags().BoolP("toggle", "t", false, "Help message for toggle" )
-
 }
