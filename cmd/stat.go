@@ -18,6 +18,8 @@ package cmd
 import (
 	"fmt"
 	"log"
+	"strings"
+	"sync"
 
 	"github.com/meson10/goraph"
 	"github.com/spf13/cobra"
@@ -42,44 +44,99 @@ func testHost(engine *G.Gilmour, host string) ([]string, error) {
 func makeGraph(engine *G.Gilmour, idents map[string]string) goraph.Graph {
 	root := goraph.MakeGraph()
 
+	var wg sync.WaitGroup
+
 	for host, _ := range idents {
-		node := goraph.NewNode(host)
-		node.SetType("host")
+		wg.Add(1)
 
-		topics, err := testHost(engine, host)
-		if err != nil {
-			msg := fmt.Sprintf("Error %v communicating with %v", host, err.Error())
-			node.SetDirty()
-			node.AddNote(msg)
-			continue
-		}
+		go func(root goraph.Graph, engine *G.Gilmour, host string) {
+			defer wg.Done()
+			node := goraph.NewNode(host)
+			node.SetType("host")
 
-		for _, t := range topics {
-			tnode := goraph.NewNode(t)
-			tnode.SetType("topic")
-			node.AddChild(tnode)
-		}
+			topics, err := testHost(engine, host)
+			if err != nil {
+				msg := fmt.Sprintf("Error %v communicating with %v", host, err.Error())
+				node.SetDirty()
+				node.AddNote(msg)
+				return
+			}
 
-		root.AddChild(node)
+			for _, t := range topics {
+				tnode := goraph.NewNode(t)
+				tnode.SetType("topic")
+				node.AddChild(tnode)
+			}
+
+			root.AddChild(node)
+		}(root, engine, host)
 	}
+
+	wg.Wait()
 	return root
+}
+
+func globIdent(idents map[string]string, patterns []string) map[string]string {
+	if len(patterns) == 0 {
+		return idents
+	}
+
+	res := map[string]string{}
+
+	for _, i := range patterns {
+		if strings.HasSuffix(i, "*") {
+			ident := strings.Split(i, "*")[0]
+			for k, _ := range idents {
+				if strings.HasPrefix(k, ident) {
+					res[k] = "true"
+				}
+			}
+		} else if _, ok := idents[i]; ok {
+			res[i] = "true"
+		}
+	}
+
+	return res
 }
 
 // statCmd respresents the stat command
 var statCmd = &cobra.Command{
 	Use:   "stat",
 	Short: "Get all registered health-idents",
+	Long: `Generates a Tree of Hosts and the topics they are listening to:
+
+	By default, it pings all hosts registered with Gilmour for health checks.
+	You can specify host(s) as arguments to stat command.
+
+	You can also provide pattern(s), but the pattern must end with an asterisk.
+
+	Example Usage:
+
+	piyush:goli master λ goli stat SatellitePro.local* hello*
+	root
+	└─── SatellitePro.local-pid-88830-uuid-38ec66c0-a09a-4005-be7e-1d2a4b0adb00
+	│    ├─── gilmour.request.request.manager.bringup.cassandra
+	│    ├─── gilmour.request.request.manager.reconfigure.cassandra
+	│    ├─── request.manager.addnodes.cassandra
+	│    ├─── gilmour.request.request.manager.addnodes.kafka
+	│    ├─── request.manager.spark.info
+	│    ├─── gilmour.request.request.manager.zookeeper.removenodes
+	│    ├─── request.manager.teardown.cassandra
+	│    ├─── request.manager.addusers.cassandra
+	`,
 	Run: func(cmd *cobra.Command, args []string) {
 		// TODO: Work your own magic here
 		redis := getBackend()
 		engine := getEngine()
 		defer engine.Stop()
 
-		idents, err := redis.ActiveIdents()
+		active_idents, err := redis.ActiveIdents()
 		if err != nil {
 			log.Println("Cannot fetch Idents:", err.Error())
 			return
 		}
+
+		idents := globIdent(active_idents, args)
 
 		engine.Start()
 		graph := makeGraph(engine, idents)

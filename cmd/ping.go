@@ -17,75 +17,75 @@ package cmd
 
 import (
 	"fmt"
-	"log"
-	"strings"
+	"time"
 
-	"github.com/meson10/goraph"
 	"github.com/spf13/cobra"
-
 	G "gopkg.in/gilmour-libs/gilmour-e-go.v4"
 )
 
-func healthGraph(engine *G.Gilmour, idents map[string]string) goraph.Graph {
-	root := goraph.MakeGraph()
-
-	for host, _ := range idents {
-		node := goraph.NewNode(host)
-		node.SetType("host")
-
-		if _, err := testHost(engine, host); err != nil {
-			msg := fmt.Sprintf("Error %v communicating with %v", host, err.Error())
-			node.SetDirty()
-			node.AddNote(msg)
-		}
-
-		root.AddChild(node)
-	}
-	return root
-}
+var wait = 1000
+var count int
+var waitTime = 5
 
 // pingCmd respresents the ping command
 var pingCmd = &cobra.Command{
 	Use:   "ping",
 	Short: "Is the gilmour subscriber still active?",
 	Long: `Is the gilmour server stil alive for the given health-ident?
-	Heartbeat is subject to a timeout. Read documentation for details.`,
+	Heartbeat is subject to a timeout. Read documentation for details.
+	`,
 	Run: func(cmd *cobra.Command, args []string) {
-		if len(args) < 1 {
+		if len(args) != 1 {
 			cmd.Help()
 			return
 		}
 
-		redis := getBackend()
+		host := args[0]
 		engine := getEngine()
 		defer engine.Stop()
-
-		active_idents, err := redis.ActiveIdents()
-		if err != nil {
-			log.Println("Cannot fetch Idents:", err.Error())
-			return
-		}
-
-		idents := map[string]string{}
-
-		for _, i := range args {
-			if strings.HasSuffix(i, "*") {
-				ident := strings.Split(i, "*")[0]
-				for k, _ := range active_idents {
-					if strings.HasPrefix(k, ident) {
-						idents[k] = "true"
-					}
-				}
-			} else if _, ok := active_idents[i]; ok {
-				idents[i] = "true"
-			}
-		}
-
 		engine.Start()
-		healthGraph(engine, idents).Walk()
+
+		data := G.NewMessage().SetData("ping?")
+
+		for i := 0; i <= count; {
+			if count > 0 {
+				i += 1
+			}
+
+			opts := G.NewRequestOpts().SetTimeout(waitTime)
+			req := engine.NewRequestWithOpts(
+				fmt.Sprintf("gilmour.health.%v", host),
+				opts,
+			)
+
+			now := time.Now().UTC()
+			resp, err := req.Execute(data)
+			if err != nil {
+				fmt.Println(fmt.Sprintf("Destination host %v unreachable", host))
+				continue
+			}
+
+			elapsed := time.Since(now)
+			msg := resp.Next()
+			if resp.Code() != 200 {
+				var x string
+				msg.GetData(&x)
+				fmt.Println(fmt.Sprintf("Error %v contacting host %v", x, host))
+			} else {
+				fmt.Println(fmt.Sprintf("Success from %v time=%v", host, elapsed))
+			}
+
+			time.Sleep(time.Duration(wait) * time.Second)
+		}
 	},
 }
 
 func init() {
+	pingCmd.Flags().IntVarP(&count, "count", "c", count, "Stop after sending (and receiving) count ECHO_RESPONSE packets. If this option is not specified, ping will operate until interrupted.")
+
+	pingCmd.Flags().IntVarP(&waitTime, "waittime", "w", waitTime, "Time in seconds to wait for a reply for each packet sent.  If a reply arrives later, the packet is not printed as replied, but considered as replied when calculating statistics.")
+
+	pingCmd.Flags().IntVarP(&wait, "wait", "i", wait, "Wait wait seconds between sending each packet. The default is to wait for 1000ms between each packet.  The wait time may be as low as 1ms, but only sensible-users would specify values less than 10ms.")
+
 	RootCmd.AddCommand(pingCmd)
 }
