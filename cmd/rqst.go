@@ -16,10 +16,15 @@
 package cmd
 
 import (
-	"fmt"
+	"io/ioutil"
+	"log"
+	"os"
 
+	ui "github.com/meson10/goerrui"
 	"github.com/spf13/cobra"
 )
+
+var file string
 
 // rqstCmd respresents the rqst command
 var rqstCmd = &cobra.Command{
@@ -29,19 +34,33 @@ var rqstCmd = &cobra.Command{
 	later be piped to an external program`,
 	Run: func(cmd *cobra.Command, args []string) {
 		// TODO: Work your own magic here
-		fmt.Println("rqst called")
+		var json string
+
+		if file != "" {
+			if _, err := os.Stat(file); os.IsNotExist(err) {
+				ui.Alert("JSON input file %v not found on Disk", file)
+				return
+			}
+
+			if data, err := ioutil.ReadFile(file); err != nil {
+				ui.Alert("Error %v while parsing JSON input", err.Error(), file)
+				return
+			} else {
+				json = string(data)
+			}
+		} else if len(args) == 1 {
+			json = args[0]
+		} else {
+			ui.Alert("Provide one of the JSON inputs")
+			cmd.Help()
+			return
+		}
+
+		log.Println(json)
 	},
 }
 
 func init() {
+	rqstCmd.Flags().StringVarP(&file, "file", "f", "", "File with JSON data")
 	RootCmd.AddCommand(rqstCmd)
-
-	// Here you will define your flags and configuration settings
-
-	// Cobra supports Persistent Flags which will work for this command and all subcommands
-	// rqstCmd.PersistentFlags().String("foo", "", "A help for foo")
-
-	// Cobra supports local flags which will only run when this command is called directly
-	// rqstCmd.Flags().BoolP("toggle", "t", false, "Help message for toggle" )
-
 }
