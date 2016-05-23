@@ -16,33 +16,39 @@
 package cmd
 
 import (
-	"fmt"
-
 	"github.com/spf13/cobra"
+
+	ui "github.com/meson10/goerrui"
+	G "gopkg.in/gilmour-libs/gilmour-e-go.v4"
 )
 
 // sgnlCmd respresents the sgnl command
 var sgnlCmd = &cobra.Command{
-	Use:   "sgnl",
-	Short: "sgnl JSON data to a slot",
-	Long: `sgnl a json data to a gilmour slot.
+	Use:   "sgnl <slot_topic>",
+	Short: "sgnl data to a slot",
+	Long: `sgnl data to a gilmour slot.
 	Do note that this does not acknowledge delivery or failure, evern there is no
 	active slot on the other side.`,
 	Run: func(cmd *cobra.Command, args []string) {
-		// TODO: Work your own magic here
-		fmt.Println("sgnl called")
+		content, topic := contentAndTopic(args)
+		if content == "" || topic == "" {
+			cmd.Help()
+			return
+		}
+
+		engine := getEngine()
+		defer engine.Stop()
+		engine.Start()
+
+		data := G.NewMessage().SetData(content)
+		if _, err := engine.Signal(topic, data); err != nil {
+			ui.Alert(err.Error())
+		}
+
 	},
 }
 
 func init() {
+	sgnlCmd.Flags().StringVarP(&file, "file", "f", "", "File with Content")
 	RootCmd.AddCommand(sgnlCmd)
-
-	// Here you will define your flags and configuration settings
-
-	// Cobra supports Persistent Flags which will work for this command and all subcommands
-	// sgnlCmd.PersistentFlags().String("foo", "", "A help for foo")
-
-	// Cobra supports local flags which will only run when this command is called directly
-	// sgnlCmd.Flags().BoolP("toggle", "t", false, "Help message for toggle" )
-
 }

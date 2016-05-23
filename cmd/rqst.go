@@ -28,17 +28,45 @@ import (
 
 var file string
 
+func contentAndTopic(args []string) (content string, topic string) {
+	if len(args) < 1 || len(args) > 2 {
+		return
+	}
+
+	topic = args[0]
+
+	if file != "" {
+		if _, err := os.Stat(file); os.IsNotExist(err) {
+			ui.Alert("Input file %v not found on Disk", file)
+			return
+		}
+
+		if data, err := ioutil.ReadFile(file); err != nil {
+			ui.Alert("Error %v while parsing File", err.Error(), file)
+			return
+		} else {
+			content = string(data)
+		}
+	} else if len(args) == 2 {
+		content = args[1]
+	} else {
+		ui.Alert("Must provide content as position argunent of a file")
+
+		return
+	}
+
+	return
+}
+
 // rqstCmd respresents the rqst command
 var rqstCmd = &cobra.Command{
-	Use:   "rqst <topic>",
+	Use:   "rqst <request_topic>",
 	Short: "Send request data and publish the response",
 	Long: `Send request data to a gilmour topic and wait for the response which can
 	later be piped to an external program`,
 	Run: func(cmd *cobra.Command, args []string) {
-		// TODO: Work your own magic here
-		var content string
-
-		if len(args) < 1 || len(args) > 2 {
+		content, topic := contentAndTopic(args)
+		if content == "" || topic == "" {
 			cmd.Help()
 			return
 		}
@@ -46,28 +74,6 @@ var rqstCmd = &cobra.Command{
 		engine := getEngine()
 		defer engine.Stop()
 		engine.Start()
-
-		topic := args[0]
-
-		if file != "" {
-			if _, err := os.Stat(file); os.IsNotExist(err) {
-				ui.Alert("Input file %v not found on Disk", file)
-				return
-			}
-
-			if data, err := ioutil.ReadFile(file); err != nil {
-				ui.Alert("Error %v while parsing File", err.Error(), file)
-				return
-			} else {
-				content = string(data)
-			}
-		} else if len(args) == 2 {
-			content = args[1]
-		} else {
-			ui.Alert("Must provide content as position argunent of a file")
-			cmd.Help()
-			return
-		}
 
 		req := engine.NewRequest(topic)
 		resp, err := req.Execute(G.NewMessage().SetData(content))
