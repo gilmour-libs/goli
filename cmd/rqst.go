@@ -16,51 +16,78 @@
 package cmd
 
 import (
+	"fmt"
 	"io/ioutil"
-	"log"
 	"os"
 
-	ui "github.com/meson10/goerrui"
 	"github.com/spf13/cobra"
+
+	ui "github.com/meson10/goerrui"
+	G "gopkg.in/gilmour-libs/gilmour-e-go.v4"
 )
 
 var file string
 
 // rqstCmd respresents the rqst command
 var rqstCmd = &cobra.Command{
-	Use:   "rqst",
-	Short: "Send JSON request and publish the response",
-	Long: `Send JSON data to a gilmour topic and wait for the response which can
+	Use:   "rqst <topic>",
+	Short: "Send request data and publish the response",
+	Long: `Send request data to a gilmour topic and wait for the response which can
 	later be piped to an external program`,
 	Run: func(cmd *cobra.Command, args []string) {
 		// TODO: Work your own magic here
-		var json string
+		var content string
 
-		if file != "" {
-			if _, err := os.Stat(file); os.IsNotExist(err) {
-				ui.Alert("JSON input file %v not found on Disk", file)
-				return
-			}
-
-			if data, err := ioutil.ReadFile(file); err != nil {
-				ui.Alert("Error %v while parsing JSON input", err.Error(), file)
-				return
-			} else {
-				json = string(data)
-			}
-		} else if len(args) == 1 {
-			json = args[0]
-		} else {
-			ui.Alert("Provide one of the JSON inputs")
+		if len(args) < 1 || len(args) > 2 {
 			cmd.Help()
 			return
 		}
 
-		log.Println(json)
+		engine := getEngine()
+		defer engine.Stop()
+		engine.Start()
+
+		topic := args[0]
+
+		if file != "" {
+			if _, err := os.Stat(file); os.IsNotExist(err) {
+				ui.Alert("Input file %v not found on Disk", file)
+				return
+			}
+
+			if data, err := ioutil.ReadFile(file); err != nil {
+				ui.Alert("Error %v while parsing File", err.Error(), file)
+				return
+			} else {
+				content = string(data)
+			}
+		} else if len(args) == 2 {
+			content = args[1]
+		} else {
+			ui.Alert("Must provide content as position argunent of a file")
+			cmd.Help()
+			return
+		}
+
+		req := engine.NewRequest(topic)
+		resp, err := req.Execute(G.NewMessage().SetData(content))
+		if err != nil {
+			ui.Alert(err.Error())
+			return
+		}
+
+		var output string
+		if err := resp.Next().GetData(&output); err != nil {
+			ui.Alert(err.Error())
+			return
+		} else {
+			fmt.Println(output)
+			return
+		}
 	},
 }
 
 func init() {
-	rqstCmd.Flags().StringVarP(&file, "file", "f", "", "File with JSON data")
+	rqstCmd.Flags().StringVarP(&file, "file", "f", "", "File with Content")
 	RootCmd.AddCommand(rqstCmd)
 }
