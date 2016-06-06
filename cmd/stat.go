@@ -21,9 +21,9 @@ import (
 	"strings"
 	"sync"
 
-	"github.com/meson10/goraph"
 	"github.com/spf13/cobra"
 	G "gopkg.in/gilmour-libs/gilmour-e-go.v4"
+	"gopkg.in/meson10/goraph.v0"
 )
 
 func testHost(engine *G.Gilmour, host string) ([]string, error) {

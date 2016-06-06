@@ -7,10 +7,10 @@ import (
 	"os/signal"
 	"sync"
 
-	"github.com/meson10/goraph"
 	"github.com/spf13/cobra"
 	G "gopkg.in/gilmour-libs/gilmour-e-go.v4"
 	"gopkg.in/gilmour-libs/gilmour-e-go.v4/backends"
+	"gopkg.in/meson10/goraph.v0"
 )
 
 var redisPort int

@@ -58,12 +58,10 @@ func contentAndTopic(args []string) (content string, topic string) {
 	return
 }
 
-// rqstCmd respresents the rqst command
-var rqstCmd = &cobra.Command{
-	Use:   "rqst <request_topic>",
-	Short: "Send request data and publish the response",
-	Long: `Send request data to a gilmour topic and wait for the response which can
-	later be piped to an external program`,
+// sendCmd respresents the send command
+var sendCmd = &cobra.Command{
+	Use:   "send <topic> <json_string> OR -f path/to/json/file",
+	Short: "Send data to request/slot topic",
 	Run: func(cmd *cobra.Command, args []string) {
 		content, topic := contentAndTopic(args)
 		if content == "" || topic == "" {
@@ -75,25 +73,36 @@ var rqstCmd = &cobra.Command{
 		defer engine.Stop()
 		engine.Start()
 
-		req := engine.NewRequest(topic)
-		resp, err := req.Execute(G.NewMessage().SetData(content))
-		if err != nil {
-			ui.Alert(err.Error())
-			return
+		data := G.NewMessage().SetData(content)
+
+		if isSlot {
+			if _, err := engine.Signal(topic, data); err != nil {
+				ui.Alert(err.Error())
+			}
+		} else {
+			req := engine.NewRequest(topic)
+			resp, err := req.Execute(data)
+			if err != nil {
+				ui.Alert(err.Error())
+				return
+			}
+
+			var output string
+			if err := resp.Next().GetData(&output); err != nil {
+				ui.Alert(err.Error())
+				return
+			} else {
+				fmt.Println(output)
+				return
+			}
 		}
 
-		var output string
-		if err := resp.Next().GetData(&output); err != nil {
-			ui.Alert(err.Error())
-			return
-		} else {
-			fmt.Println(output)
-			return
-		}
+		return
 	},
 }
 
 func init() {
-	rqstCmd.Flags().StringVarP(&file, "file", "f", "", "File with Content")
-	RootCmd.AddCommand(rqstCmd)
+	sendCmd.Flags().BoolVarP(&isSlot, "slot", "", false, "Is this topic a slot?")
+	sendCmd.Flags().StringVarP(&file, "file", "f", "", "File with Content")
+	RootCmd.AddCommand(sendCmd)
 }
